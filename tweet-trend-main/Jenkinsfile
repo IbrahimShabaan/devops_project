@@ -1,12 +1,12 @@
-    // <!-- version from url after signup jfrog -->
 def registry = 'https://valaxy05.jfrog.io'
+def imageName = 'valaxy05.jfrog.io/valaxy-docker-local/ttrend'
+def version   = '2.1.4'
 pipeline {
     agent {
         node {
             label 'maven'
         }
     }
-    // Pass Path with Maven path
 environment {
     PATH = "/opt/apache-maven-3.9.2/bin:$PATH"
 }
@@ -14,12 +14,10 @@ environment {
         stage("build"){
             steps {
                  echo "----------- build started ----------"
-                 // Don't excute in inner test , just excute it 
                 sh 'mvn clean deploy -Dmaven.test.skip=true'
                  echo "----------- build complted ----------"
             }
         }
-        // Test Stage By SonarCLoud with Jenkins
         stage("test"){
             steps{
                 echo "----------- unit test started ----------"
@@ -27,7 +25,7 @@ environment {
                  echo "----------- unit test Complted ----------"
             }
         }
-// in tool of SonarCloud Plugin in Jenkins
+
     stage('SonarQube analysis') {
     environment {
       scannerHome = tool 'valaxy-sonar-scanner'
@@ -38,15 +36,12 @@ environment {
     }
     }
   }
-  // Quality Gate test in SonarCloud
-  // Code from Jenkins in Sonarqube website
   stage("Quality Gate"){
     steps {
         script {
         timeout(time: 1, unit: 'HOURS') { // Just in case something goes wrong, pipeline will be killed after a timeout
     def qg = waitForQualityGate() // Reuse taskId previously collected by withSonarQubeEnv
     if (qg.status != 'OK') {
-      // result appear on Jenkins Build
       error "Pipeline aborted due to quality gate failure: ${qg.status}"
     }
   }
@@ -62,26 +57,54 @@ environment {
                      def uploadSpec = """{
                           "files": [
                             {
-                             // <!-- copy this files to Jfrog -->
-                             //   <!-- // path directory  -->
                               "pattern": "jarstaging/(*)",
                               "target": "libs-release-local/{1}",
                               "flat": "false",
                               "props" : "${properties}",
-                             // <!-- // except this flles like .gitignore -->
                               "exclusions": [ "*.sha1", "*.md5"]
                             }
                          ]
                      }"""
-                     //   <!-- Upload Step -->
-
                      def buildInfo = server.upload(uploadSpec)
                      buildInfo.env.collect()
                      server.publishBuildInfo(buildInfo)
-                    //  echo '<--------------- Jar Publish Ended --------------->'  
+                     echo '<--------------- Jar Publish Ended --------------->'  
             
             }
         }   
-    }   
+    }
+
+
+    stage(" Docker Build ") {
+      steps {
+        script {
+           echo '<--------------- Docker Build Started --------------->'
+           app = docker.build(imageName+":"+version)
+           echo '<--------------- Docker Build Ends --------------->'
+        }
+      }
+    }
+
+            stage (" Docker Publish "){
+        steps {
+            script {
+               echo '<--------------- Docker Publish Started --------------->'  
+                docker.withRegistry(registry, 'artfiact-cred'){
+                    app.push()
+                }    
+               echo '<--------------- Docker Publish Ended --------------->'  
+            }
+        }
+    }
+
+stage(" Deploy ") {
+       steps {
+         script {
+            echo '<--------------- Helm Deploy Started --------------->'
+            sh 'helm install ttrend ttrend-1.0.1.tgz'
+            echo '<--------------- Helm deploy Ends --------------->'
+         }
+       }
+     }  
 }
 }

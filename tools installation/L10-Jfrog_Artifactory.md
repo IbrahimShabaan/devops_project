@@ -5,6 +5,7 @@
 4. Install Artifactory plugin  
 5. Update Jenkinsfile with jar publish stage   
     ```sh 
+    <!-- version from url after signup jfrog -->
          def registry = 'https://valaxy01.jfrog.io'
              stage("Jar Publish") {
             steps {
@@ -15,14 +16,18 @@
                          def uploadSpec = """{
                               "files": [
                                 {
+                                <!-- copy this files to Jfrog -->
+                                <!-- // path directory  -->
                                   "pattern": "jarstaging/(*)",
                                   "target": "libs-release-local/{1}",
                                   "flat": "false",
                                   "props" : "${properties}",
+                                  <!-- // except this flles like .gitignore -->
                                   "exclusions": [ "*.sha1", "*.md5"]
                                 }
                              ]
                          }"""
+                         <!-- Upload Step -->
                          def buildInfo = server.upload(uploadSpec)
                          buildInfo.env.collect()
                          server.publishBuildInfo(buildInfo)
